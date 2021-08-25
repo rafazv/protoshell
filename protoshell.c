@@ -14,13 +14,14 @@
 
 // declaração antecipada das funções usadas no programa
 void iniciar_terminal();
-int leitura_input(char* usu_input);
+void leitura_input(char* usu_input);
 int parse_input_pipe(char* usu_input, char** usu_input_pipe);
 int parse_input(char* usu_input, char** parsed_input);
-int pwd();
+void pwd();
 int cd(char** args);
 int help();
 int exec_prog(char** args);
+int exec_prog_piped (char** args1, char** args2);
 
 int main() {
     int flag_controle = 1; // 1 = programa em execução / 0 = exit
@@ -69,10 +70,10 @@ int main() {
         if (usu_input_pipe[1] != NULL) {
 			parse_input(usu_input_pipe[1], parsed_input2);
             // executa o programa que usa pipe
-			// exec_prog_piped(parsed_input, parsed_input2);
+			exec_prog_piped(parsed_input, parsed_input2);
 		}
 
-        // exec comando único - ls, cd, pwd, help, etc...
+        // exec comando único
         else if (parsed_input[0] != NULL) exec_prog(parsed_input);
     }
 
@@ -95,9 +96,9 @@ void iniciar_terminal() {
 }
 
 // leitura input
-int leitura_input(char* usu_input) {
+void leitura_input(char* usu_input) {
 	fgets(usu_input, INPUT_SIZE, stdin);
-	return 1;
+	// return 1;
 }
 
 // input: pipe1 | pipe2
@@ -134,15 +135,13 @@ int parse_input(char* usu_input, char** parsed_input) {
 }
 
 // pwd - diretorio corrente
-int pwd() {
+void pwd() {
 	char current_dir[300];
 
 	getcwd(current_dir, 300);
 	printf("\n");
 	printf("%s\n", current_dir);
 	printf("\n");
-
-	return 1;
 }
 
 // cd - mudar diretorio corrente
@@ -170,9 +169,9 @@ int cd(char** args) {
 
 int help() {
 	printf("\n");
-	printf("### Comandos nativos do shell:\n");
-	printf(" pwd\n cd\n ls\n cat\n more\n head\n clear\n exit\n");
-	return 1;
+	printf("### Comandos disponiveis:\n");
+	printf(" pwd\n cd\n ls\n cat\n clear\n exit\n outros comandos pre-instalados no Linux\n");
+    return 1;
 }
 
 // executa prog caso não haja pipe
@@ -221,6 +220,58 @@ int exec_prog(char** args) {
         }
     } else wait(NULL);
 
-
     return 0;
+}
+
+// executa programas que possuem pipe
+// saída de prog1 (args1) será entrada de prog2 (args2)
+int exec_prog_piped (char** args1, char** args2) {
+    int p[2];
+    int p_pid1, p_pid2;
+
+    if (!strcmp(args1[0], "help")) return help();
+
+    if (pipe(p) < 0) {
+        printf("\n### ERRO: pipe nao pode ser executado\n\n");
+        return -1;
+    }
+
+    p_pid1 = fork();
+
+    if (p_pid1 < 0) {
+        printf("\n### ERRO: Fork falhou. Abortando...\n\n");
+        return -1;
+    } else if (p_pid1 == 0) { // processo filho 1 - escreve
+        close(p[0]);
+        dup2(p[1], 1);
+        close(p[1]);
+
+        if (execvp(args1[0], args1) < 0) {
+            printf("\n### ERRO: <pipe1> invalido\n\n");
+            exit(1);
+        }
+
+    } else {
+        p_pid2 = fork();
+
+        if (p_pid2 < 0) {
+            printf("\n### ERRO: Fork falhou. Abortando...\n\n");
+            return -1;
+        } else if (p_pid2 == 0) { // processo filho 2 - lê
+            close(p[1]);
+            dup2(p[0], 0);
+            close(p[0]);
+
+            if (execvp(args2[0], args2) < 0) {
+                printf("\n### ERRO: <pipe2> invalido\n\n");
+                exit(1);
+            }
+        } else {
+            // processo pai irá aguardar os filhos terminarem
+            wait(NULL);
+            wait(NULL);
+        }
+    }
+
+    return 1;
 }
