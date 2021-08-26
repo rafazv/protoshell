@@ -83,6 +83,7 @@ void iniciar_terminal() {
     printf("******************"
         "************************");
     printf("\n\n\n\t****PROTO TERMINAL****");
+    printf("\n\n\n\t***POR: RAFAELA LIMA***");
     printf("\n\n\n\n*******************"
         "***********************");
     printf("\n\n");
@@ -165,7 +166,7 @@ int cd(char** args) {
 int help() {
 	printf("\n");
 	printf("### Comandos disponiveis:\n");
-	printf(" pwd\n cd\n ls\n cat\n clear\n exit\n outros comandos pre-instalados no Linux\n");
+	printf(" pwd: mostrar diretorio atual\n cd <folder> ou ..: entrar em um diretorio ou voltar para o anterior\n ls: listar arquivos do diretorio atual\n cat <file>: mostrar conteudo de arquivo\n clear: limpar bash\n exit: sair\n outros comandos pre-instalados no Linux\n");
     return 1;
 }
 
@@ -174,6 +175,9 @@ int exec_prog(char** args, int tam) {
     int p_pid = -1;
 	int exec_resp;
 	int in, out, i;
+    int bg = 0;
+
+    int filho_pid;
 
     if (!strcmp(args[0], "cd")) return cd(args);
     if (!strcmp(args[0], "help")) return help();
@@ -184,9 +188,16 @@ int exec_prog(char** args, int tam) {
         printf("\n### ERRO: Fork falhou. Abortando...\n\n");
         exit(1);
     } else if (p_pid == 0) {
-
+        filho_pid = (int) getpid();
         for (i=0; i<tam; i++) {
             if (args[i] != NULL) {
+
+                if (!strcmp(args[i], "&")) {
+                    printf("Processo filho rodando: %d\n", filho_pid);
+                    bg = 1;
+                    args[i] = NULL;
+                }
+
                 if (!strcmp(args[i], "<")) {
                     in = open(args[i+1], O_RDONLY, 0);
                     if (in < 0) {
@@ -208,13 +219,8 @@ int exec_prog(char** args, int tam) {
                     dup2(out, 1);
                     close(out);
                 }
-
-                // if (!strcmp(args[i], "&")) {
-
-                // }
             }
         }
-
 
         // executa programas
         exec_resp = execvp(args[0], args);
@@ -222,7 +228,8 @@ int exec_prog(char** args, int tam) {
             printf("\n### ERRO: comando invalido\n\n");
             exit(1);
         }
-    } else wait(NULL);
+    } 
+    if (!bg) wait(NULL);
 
     return 0;
 }
